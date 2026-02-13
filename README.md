@@ -6,21 +6,22 @@ do you have lots of pdfs that you want to search through visually? do you have a
 
 ### Features
 
-- search through pdfs by text description (not OCR)
+#### search through pdfs by text description (not OCR)
   
 
 https://github.com/user-attachments/assets/880c4caf-1367-4836-bc36-ef35524e1b2d
 
 
 
-- search for all photos similar to a particular photo
+#### search for all photos similar to a particular photo
   
 
 https://github.com/user-attachments/assets/5ab6b907-5b08-4ef9-8ead-4b1b25510ce0
 
 
-- can use OPT files to speed up indexing
-- can export your index files to backup or share with others
+#### can use OPT files to speed up indexing
+#### can export your index files to backup or share with others
+ - on the web gui with admin mode enabled, or via cli
 
 ## Quick Start
 
