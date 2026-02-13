@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# Data (large, not tracked)
+VOL00011/
+_data/
+*.zip
+*.tar
+qdrant_storage/
+
+# Databases
+*.db
+*.db-wal
+*.db-shm
+
+# Backups
+backups/
+
+# Environment
+.env
+
+# Playwright
+.playwright-mcp/
+
+# Screenshots (test artifacts)
+*.png
+
+# IDE
+.vscode/
+.idea/
+
+# Internal docs
+docs/internal/
+
+# Build artifacts
+web/dist/
+
+# Test/cache
+.pytest_cache/

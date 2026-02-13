@@ -1,0 +1,11 @@
+VOL00011/
+qdrant_storage/
+.venv/
+web/node_modules/
+web/dist/
+.git/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.claude/

@@ -1,0 +1,95 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "${QDRANT_PORT:-6335}:6333"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  index:
+    image: ghcr.io/bcherb2/pdfiles/index:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.index
+    volumes:
+      - pdf_data:/data:ro
+      - model_cache:/models
+      - local_data:/local
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - DEVICE=${INDEX_DEVICE:-cuda:0}
+      - BOUNCER_DB=/local/bouncer.db
+      - LIBRARIAN_DB=/local/librarian.db
+      - MANIFEST_DB=/local/manifest.db
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    profiles:
+      - index
+
+  backend:
+    image: ghcr.io/bcherb2/pdfiles/backend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    volumes:
+      - pdf_data:/data:ro
+      - model_cache:/models
+      - local_data:/local
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - DEVICE=${BACKEND_DEVICE:-cuda:0}
+      - BOUNCER_DB=/local/bouncer.db
+      - LIBRARIAN_DB=/local/librarian.db
+      - MANIFEST_DB=/local/manifest.db
+      - ADMIN_MODE=${ADMIN_MODE:-false}
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/status"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+
+  frontend:
+    image: ghcr.io/bcherb2/pdfiles/frontend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "${WEB_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  qdrant_data:
+  model_cache:
+  local_data:
+  pdf_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${DATA_PATH:?Set DATA_PATH in .env}"

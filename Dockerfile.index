@@ -1,0 +1,29 @@
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common gpg-agent && \
+    add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 python3.12-venv python3.12-dev \
+    libgl1-mesa-glx libglib2.0-0 \
+    curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+# Copy dependency files first for layer caching
+COPY pyproject.toml uv.lock ./
+COPY src/ src/
+
+# Install all dependencies
+RUN uv sync --frozen
+
+ENV DATA_ROOT=/data
+ENV QDRANT_URL=http://qdrant:6333
+ENV HF_HOME=/models
+
+ENTRYPOINT ["uv", "run", "pdfiles"]

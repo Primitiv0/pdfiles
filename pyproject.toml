@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pdfiles"
+version = "0.1.0"
+description = "a way to search through all your millions of pdf pages visually"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pymupdf>=1.25.0",
+    "colpali-engine>=0.3.7",
+    "transformers>=4.50.0",
+    "torch>=2.4.0",
+    "Pillow>=10.0.0",
+    "qdrant-client>=1.12.0",
+    "click>=8.1.0",
+    "tqdm>=4.66.0",
+    "surya-ocr>=0.8.0",
+    "scikit-learn>=1.4.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-multipart>=0.0.12",
+    "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "gradio>=5.0.0",
+]
+
+[project.scripts]
+pdfiles = "pdfiles.cli:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pdfiles"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
