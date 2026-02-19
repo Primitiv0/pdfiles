@@ -12,8 +12,12 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Results count
-  const [topK, setTopK] = useState(10);
+  // Pagination
+  const [perPage, setPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [fetchedTopK, setFetchedTopK] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const searchContextRef = useRef(null); // { type: 'text', query } | { type: 'similar', pointId }
 
   // Lightbox state
   const [lightboxIndex, setLightboxIndex] = useState(null);
@@ -114,23 +118,29 @@ function App() {
     }
   };
 
+  const FETCH_BATCH = 100;
+  const FETCH_MAX = 500;
+
   // Search on Enter key
-  const handleSearch = useCallback(async (overrideTopK) => {
+  const handleSearch = useCallback(async () => {
     const q = query.trim();
     if (!q) return;
     setLoading(true);
     setError(null);
     setLightboxIndex(null);
+    setCurrentPage(1);
+    searchContextRef.current = { type: 'text', query: q };
     try {
-      const results = await searchPages(q, overrideTopK ?? topK);
+      const results = await searchPages(q, FETCH_BATCH);
       setSearchResults(results);
+      setFetchedTopK(FETCH_BATCH);
     } catch (e) {
       setError(e.message);
       setSearchResults([]);
     } finally {
       setLoading(false);
     }
-  }, [query, topK]);
+  }, [query]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') handleSearch();
@@ -141,6 +151,9 @@ function App() {
     setSearchResults([]);
     setError(null);
     setLightboxIndex(null);
+    setCurrentPage(1);
+    setFetchedTopK(0);
+    searchContextRef.current = null;
   };
 
   const handleExport = async () => {
@@ -187,17 +200,59 @@ function App() {
     setActiveClusterId(null);
     setActiveCluster(null);
     setClusterPages([]);
+    setCurrentPage(1);
+    searchContextRef.current = { type: 'similar', pointId };
     setQuery(`Similar to ${label}`);
     try {
-      const results = await searchSimilar(pointId, topK);
+      const results = await searchSimilar(pointId, FETCH_BATCH);
       setSearchResults(results);
+      setFetchedTopK(FETCH_BATCH);
     } catch (e) {
       setError(e.message);
       setSearchResults([]);
     } finally {
       setLoading(false);
     }
-  }, [topK]);
+  }, []);
+
+  // Derived pagination
+  const totalPages = Math.ceil(searchResults.length / perPage);
+  const paginatedResults = searchResults.slice((currentPage - 1) * perPage, currentPage * perPage);
+  const canLoadMore = fetchedTopK < FETCH_MAX && searchResults.length >= fetchedTopK;
+
+  // Page navigation — transparently fetches more when paging beyond the buffer
+  const handlePageChange = useCallback(async (page) => {
+    // If the requested page is within what we have, just navigate
+    if (page <= totalPages) {
+      setCurrentPage(page);
+      return;
+    }
+    // Need more results — fetch next batch and advance
+    const ctx = searchContextRef.current;
+    if (!ctx || fetchedTopK >= FETCH_MAX) return;
+    const nextTopK = Math.min(fetchedTopK + FETCH_BATCH, FETCH_MAX);
+    setLoadingMore(true);
+    try {
+      const results = ctx.type === 'text'
+        ? await searchPages(ctx.query, nextTopK)
+        : await searchSimilar(ctx.pointId, nextTopK);
+      setSearchResults(results);
+      setFetchedTopK(nextTopK);
+      // Advance to the next page (first page of new results)
+      setCurrentPage(totalPages + 1);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [totalPages, fetchedTopK]);
+
+  // Scroll to top on page change
+  useEffect(() => {
+    if (currentPage > 1) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [currentPage]);
 
   const hasSearchResults = searchResults.length > 0 || query.trim();
   const COLORS = [
@@ -366,28 +421,40 @@ function App() {
                 </h2>
                 <div className="flex items-center gap-3">
                   <select
-                    value={topK}
+                    value={perPage}
                     onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setTopK(val);
-                      handleSearch(val);
+                      setPerPage(Number(e.target.value));
+                      setCurrentPage(1);
                     }}
                     className="text-xs font-mono text-gray-400 bg-gray-900 px-2 py-1 rounded-md border border-gray-800 focus:outline-none focus:border-indigo-500/50 cursor-pointer appearance-none"
                   >
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
+                    <option value={10}>10 per page</option>
+                    <option value={25}>25 per page</option>
+                    <option value={50}>50 per page</option>
+                    <option value={100}>100 per page</option>
                   </select>
                 </div>
               </div>
 
               {searchResults.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                  {searchResults.map((r, i) => (
-                    <PageCard key={r.point_id} result={r} onClick={() => { setLightboxItems(searchResults); setLightboxIndex(i); }} />
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                    {paginatedResults.map((r, i) => (
+                      <PageCard key={r.point_id} result={r} onClick={() => { setLightboxItems(searchResults); setLightboxIndex((currentPage - 1) * perPage + i); }} />
+                    ))}
+                  </div>
+                  {(totalPages > 1 || canLoadMore) && (
+                    <PaginationControls
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      totalResults={searchResults.length}
+                      perPage={perPage}
+                      onPageChange={handlePageChange}
+                      canLoadMore={canLoadMore}
+                      loadingMore={loadingMore}
+                    />
+                  )}
+                </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-gray-600 space-y-4">
                   <Search className="h-12 w-12 opacity-20" />
@@ -606,5 +673,73 @@ const PageCard = ({ result, onClick }) => (
     </div>
   </div>
 );
+
+function PaginationControls({ currentPage, totalPages, totalResults, perPage, onPageChange, canLoadMore, loadingMore }) {
+  const start = (currentPage - 1) * perPage + 1;
+  const end = Math.min(currentPage * perPage, totalResults);
+  const onLastPage = currentPage === totalPages;
+  const nextDisabled = onLastPage && !canLoadMore;
+
+  // Build page numbers with ellipsis for >7 pages
+  const getPageNumbers = () => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    const pages = [];
+    pages.push(1);
+    if (currentPage > 3) pages.push('...');
+    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+      pages.push(i);
+    }
+    if (currentPage < totalPages - 2) pages.push('...');
+    pages.push(totalPages);
+    return pages;
+  };
+
+  return (
+    <div className="flex items-center justify-between px-2 pt-2">
+      <span className="text-sm text-gray-500">
+        Showing {start}–{end} of {totalResults}{canLoadMore ? '+' : ''}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="p-1.5 rounded-md text-gray-400 hover:bg-white/5 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        {getPageNumbers().map((page, i) =>
+          page === '...' ? (
+            <span key={`ellipsis-${i}`} className="px-2 text-gray-600 text-sm">...</span>
+          ) : (
+            <button
+              key={page}
+              onClick={() => onPageChange(page)}
+              className={`min-w-[2rem] h-8 rounded-md text-sm font-medium transition-colors ${
+                page === currentPage
+                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                  : 'text-gray-400 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              {page}
+            </button>
+          )
+        )}
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={nextDisabled || loadingMore}
+          className="p-1.5 rounded-md text-gray-400 hover:bg-white/5 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          {loadingMore ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default App;

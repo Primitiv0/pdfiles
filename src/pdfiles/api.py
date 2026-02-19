@@ -156,7 +156,7 @@ def index_status():
 @app.get("/api/search")
 def search(
     q: str = Query(..., min_length=1),
-    top_k: int = Query(10, ge=1, le=100),
+    top_k: int = Query(10, ge=1, le=500),
     multi: bool = Query(True, description="Use multi-query RRF (better quality, 3x slower)"),
 ):
     if multi:
@@ -182,7 +182,7 @@ def search(
 @app.get("/api/search/similar")
 def search_similar(
     point_id: int = Query(..., description="Qdrant integer point ID"),
-    top_k: int = Query(10, ge=1, le=100),
+    top_k: int = Query(10, ge=1, le=500),
 ):
     from pdfiles.qdrant_store import QdrantStore
 
