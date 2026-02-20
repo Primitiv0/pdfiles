@@ -45,6 +45,17 @@ export async function searchSimilar(pointId, topK = 10) {
   return res.json();
 }
 
+export async function searchByImage(file, topK = 10) {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${API_BASE}/search/image?top_k=${topK}`, {
+    method: 'POST',
+    body: form,
+  });
+  if (!res.ok) throw new Error(`Image search failed: ${res.status}`);
+  return res.json();
+}
+
 export function pageImageUrl(pointId) {
   return `${API_BASE}/page/${pointId}/image`;
 }

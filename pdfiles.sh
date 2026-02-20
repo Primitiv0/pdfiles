@@ -128,6 +128,24 @@ cmd_up() {
     print_urls
 }
 
+cmd_update() {
+    local force_mode=""
+    for arg in "$@"; do
+        case "$arg" in
+            --cpu) force_mode="cpu" ;;
+            --gpu) force_mode="gpu" ;;
+        esac
+    done
+
+    local compose_file
+    compose_file=$(detect_compose_file "$force_mode")
+    echo "Pulling latest images..."
+    docker compose -f "$compose_file" pull
+    echo "Restarting services..."
+    docker compose -f "$compose_file" up -d
+    print_urls
+}
+
 cmd_down() {
     local clean=false
     for arg in "$@"; do
@@ -569,6 +587,7 @@ Usage: ./pdfiles.sh <command> [options]
 Commands:
   deploy [DATA_PATH]        First-time setup (creates .env, builds, starts)
   up [--build] [--cpu]      Start services
+  update [--cpu]            Pull latest images and restart
   down [--clean]            Stop services (--clean removes volumes)
   logs [SERVICE]            Tail logs
   status                    Health dashboard
@@ -598,6 +617,7 @@ shift 2>/dev/null || true
 case "$COMMAND" in
     deploy)  cmd_deploy "$@" ;;
     up)      cmd_up "$@" ;;
+    update)  cmd_update "$@" ;;
     down)    cmd_down "$@" ;;
     logs)    cmd_logs "$@" ;;
     status)  cmd_status "$@" ;;

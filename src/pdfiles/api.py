@@ -1,3 +1,4 @@
+import asyncio
 import io
 import logging
 import threading
@@ -6,7 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -163,6 +164,40 @@ def search(
         results = _searcher.search_multi(q, top_k=top_k)
     else:
         results = _searcher.search(q, top_k=top_k)
+    return [
+        {
+            "page_id": r.page_id,
+            "pdf_path": r.pdf_path,
+            "source_path": str(_resolve_pdf_path(r.pdf_path)),
+            "pdf_id": r.pdf_id,
+            "page_index": r.page_index,
+            "total_pages": r.total_pages,
+            "volume": r.volume,
+            "score": r.score,
+            "point_id": r.point_id,
+        }
+        for r in results
+    ]
+
+
+@app.post("/api/search/image")
+async def search_by_image(
+    file: UploadFile = File(...),
+    top_k: int = Query(10, ge=1, le=500),
+):
+    ALLOWED_TYPES = {"image/jpeg", "image/png"}
+    if file.content_type not in ALLOWED_TYPES:
+        raise HTTPException(status_code=415, detail=f"Unsupported file type: {file.content_type}. Use JPEG or PNG.")
+
+    MAX_SIZE = 10 * 1024 * 1024  # 10 MB
+    data = await file.read()
+    if len(data) > MAX_SIZE:
+        raise HTTPException(status_code=413, detail="File too large (max 10 MB)")
+
+    from PIL import Image
+
+    image = Image.open(io.BytesIO(data)).convert("RGB")
+    results = await asyncio.to_thread(_searcher.search_by_image, image, top_k=top_k)
     return [
         {
             "page_id": r.page_id,

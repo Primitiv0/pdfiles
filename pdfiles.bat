@@ -9,6 +9,7 @@ if "%COMMAND%"=="" set "COMMAND=help"
 
 if "%COMMAND%"=="deploy" goto :deploy
 if "%COMMAND%"=="up" goto :up
+if "%COMMAND%"=="update" goto :update
 if "%COMMAND%"=="down" goto :down
 if "%COMMAND%"=="logs" goto :logs
 if "%COMMAND%"=="status" goto :status
@@ -57,6 +58,15 @@ echo.
 echo Frontend: http://localhost:80
 goto :eof
 
+:update
+echo Pulling latest images...
+docker compose pull
+echo Restarting services...
+docker compose up -d
+echo.
+echo Frontend: http://localhost:80
+goto :eof
+
 :down
 echo Stopping services...
 docker compose down
@@ -83,6 +93,7 @@ echo.
 echo Commands:
 echo   deploy DATA_PATH    First-time setup (creates .env, builds, starts)
 echo   up                  Start services
+echo   update              Pull latest images and restart
 echo   down                Stop services
 echo   logs [SERVICE]      View logs
 echo   status              Health check

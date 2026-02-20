@@ -39,6 +39,12 @@ class Searcher:
             return f"Photograph or image showing: {query}"
         return query
 
+    def search_by_image(self, image: "PIL.Image.Image", top_k: int = 10) -> list[SearchResult]:
+        """Search for pages visually similar to an uploaded image."""
+        embeddings = self.embedder.embed_images([image])
+        query_vectors = embeddings[0].tolist()
+        return self.store.search(query_vectors, top_k=top_k)
+
     def search(self, query: str, top_k: int = 10) -> list[SearchResult]:
         """Search for pages matching a text query (single-query with expansion)."""
         expanded = self.expand_query(query)

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, ArrowLeft, X, LayoutGrid, Loader2, Database, Download, ChevronLeft, ChevronRight, Scan } from 'lucide-react';
-import { searchPages, searchSimilar, getClusters, getClusterDetail, getStatus, startIndexing, getIndexStatus, pageImageUrl, exportSnapshot } from './api';
+import { Search, ArrowLeft, X, LayoutGrid, Loader2, Database, Download, ChevronLeft, ChevronRight, Scan, ImagePlus } from 'lucide-react';
+import { searchPages, searchSimilar, searchByImage, getClusters, getClusterDetail, getStatus, startIndexing, getIndexStatus, pageImageUrl, exportSnapshot } from './api';
 
 function App() {
   const [query, setQuery] = useState('');
@@ -36,6 +36,7 @@ function App() {
   });
   const [indexError, setIndexError] = useState(null);
   const pollRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Connection status
   const [backendReady, setBackendReady] = useState(false);
@@ -156,6 +157,34 @@ function App() {
     searchContextRef.current = null;
   };
 
+  const handleImageSearch = useCallback(async (file) => {
+    setLoading(true);
+    setError(null);
+    setLightboxIndex(null);
+    setCurrentPage(1);
+    setActiveClusterId(null);
+    setActiveCluster(null);
+    setClusterPages([]);
+    searchContextRef.current = { type: 'image' };
+    setQuery(`Image: ${file.name}`);
+    try {
+      const results = await searchByImage(file, FETCH_BATCH);
+      setSearchResults(results);
+      setFetchedTopK(FETCH_MAX); // disable load-more — file is ephemeral
+    } catch (e) {
+      setError(e.message);
+      setSearchResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleImageSearch(file);
+    e.target.value = '';
+  };
+
   const handleExport = async () => {
     setExporting(true);
     try {
@@ -229,7 +258,7 @@ function App() {
     }
     // Need more results — fetch next batch and advance
     const ctx = searchContextRef.current;
-    if (!ctx || fetchedTopK >= FETCH_MAX) return;
+    if (!ctx || ctx.type === 'image' || fetchedTopK >= FETCH_MAX) return;
     const nextTopK = Math.min(fetchedTopK + FETCH_BATCH, FETCH_MAX);
     setLoadingMore(true);
     try {
@@ -286,20 +315,36 @@ function App() {
               </div>
               <input
                 type="text"
-                className="block w-full pl-4 pr-12 py-4 bg-transparent border-none text-white placeholder-gray-600 focus:outline-none focus:ring-0 text-lg"
+                className="block w-full pl-4 pr-20 py-4 bg-transparent border-none text-white placeholder-gray-600 focus:outline-none focus:ring-0 text-lg"
                 placeholder="Search documents..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
               />
-              {query && (
+              <div className="absolute inset-y-0 right-0 pr-4 flex items-center gap-2">
+                {query && (
+                  <button
+                    onClick={clearSearch}
+                    className="cursor-pointer text-gray-500 hover:text-gray-300"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                )}
                 <button
-                  onClick={clearSearch}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center cursor-pointer text-gray-500 hover:text-gray-300"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="cursor-pointer text-gray-500 hover:text-indigo-400 transition-colors"
+                  title="Search by image"
                 >
-                  <X className="h-5 w-5" />
+                  <ImagePlus className="h-5 w-5" />
                 </button>
-              )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+              </div>
             </div>
           </div>
 
