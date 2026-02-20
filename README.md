@@ -21,7 +21,12 @@ https://github.com/user-attachments/assets/5ab6b907-5b08-4ef9-8ead-4b1b25510ce0
 
 #### reverse image search — upload a photo to find similar pages
 
+![searchbyimage](https://github.com/user-attachments/assets/1581304c-01de-40f2-94e1-9cdceeeb079d)
+
+
 #### can use OPT files to speed up indexing
+
+
 #### can export your index files to backup or share with others
  - on the web gui with admin mode enabled, or via cli
 
